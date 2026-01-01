@@ -26,7 +26,7 @@ accept <- 0
 iters <- 20000
 proposal_sd <- 1
 #defining jumper standard deviation
-jumper_stds <- rep(0.3, p)
+jumper_stds <- rep(0.25, p)
 samples <- matrix(NA, iters, p)
 accept <- rep(0, p)
 
@@ -62,5 +62,6 @@ for (i in 1:iters) {
 
 accept_rate <- accept / iters
 accept_rate
+
 
 
