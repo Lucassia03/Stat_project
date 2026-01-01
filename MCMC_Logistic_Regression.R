@@ -11,7 +11,7 @@ true_mu <- 1
 CreditCard <- na.omit(CreditCard)
 n <- nrow(CreditCard)
 y <- ifelse(CreditCard$card == "yes", 1, 0)
-X_data <- CreditCard[, !(names(CreditCard) %in% c("card", "share", "expenditure", "income", "age", "months"))]
+X_data <- CreditCard[, !(names(CreditCard) %in% c("card", "income", "age", "months"))]
 X <- model.matrix(~ ., data = X_data)
 X[, -1] <- scale(X[, -1])
 p <- ncol(X)
@@ -100,5 +100,6 @@ for (i in 1:iters) {
 
 accept_rate_final <- accept / iters
 accept_rate_final
+
 
 
