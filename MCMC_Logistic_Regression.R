@@ -41,7 +41,7 @@ X <- model.matrix(~ ., data = X_data)
 p <- ncol(X)
 
 
-#MCMC (Metropolis-within-Gibbs)
+#MCMC (Metropolis)
 
 set.seed(123)
 
@@ -100,5 +100,56 @@ bayes_summary <- data.frame(
 )
 
 print(bayes_summary)
+
+
+
+
+# MCMC diagnostics for one coefficient
+
+# choose coefficient required by assignment
+#If you desire for other coeficient change the name here
+coef_name <- "intercept"
+coef_idx  <- which(colnames(X) == coef_name)
+
+# remove burn-in
+burnin <- 2000
+coef_sample <- samples[(burnin + 1):iters, coef_idx]
+
+# plotting layout
+par(mfrow = c(2, 2))
+
+# 1) Trace plot
+plot(coef_sample,
+     type = "l",
+     main = paste("Trace plot –", coef_name),
+     xlab = "Iteration",
+     ylab = expression(beta))
+
+# 2) Autocorrelation plot
+acf(coef_sample,
+    main = paste("ACF –", coef_name))
+
+# 3) Histogram (posterior)
+hist(coef_sample,
+     breaks = 40,
+     freq = FALSE,
+     main = paste("Posterior distribution –", coef_name),
+     xlab = expression(beta))
+
+# 4) Density curve (overlay)
+lines(density(coef_sample),
+      col = "red",
+      lwd = 2)
+
+# optional: posterior mean and 95% credible interval
+abline(v = mean(coef_sample), col = "blue", lwd = 2)
+abline(v = quantile(coef_sample, c(0.025, 0.975)),
+       col = "darkgreen", lty = 2, lwd = 2)
+
+# reset layout
+par(mfrow = c(1, 1))
+
+
+
 
 
