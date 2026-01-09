@@ -1,0 +1,92 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath, amssymb}
+\usepackage[margin=1in]{geometry}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\title{Bayesian and Frequentist GLM estimation}
+\author{Federico Boiocchi, Riccardo Favazza, Federico Giachetti, Luca Siano}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent In this report, we present the theoretical foundations of generalized linear model (GLM) estimation from both frequentist and Bayesian perspectives. We begin by describing Fisher's scoring and its iteratively reweighted least squares (IRLS) formulation for models with both canonical and non-canonical link functions. We then introduce a Markov chain Monte Carlo (MCMC) algorithm for Bayesian estimation of the same models, and conclude with comments on the corresponding R analysis
+\end{abstract}
+
+\section{Fisher's Scoring}
+Fisher's scoring (FS) is a variant of the well-known Newton-Raphson algorithm used to find roots of multivariate functions. Considering a Generalized Linear Model (GLM), in a frequentist setting, we are usually interested in finding the maximizer of the log-likelihood of the data seen as a function of the regression coefficients. Often, since no closed-form solutions are available, we need to approximate them iteratively using FS. The structure of the FS in the most general case (non-canonical link setting) is very similar to a multivariate Newton-Raphson applied to the log-likelihood of the model with the Hessian matrix replaced with the expected Fisher Information matrix:
+\begin{equation}
+\label{FS}
+\boldsymbol{\beta}_{k+1}=\boldsymbol{\beta}_k+\underset{\mathbf{y}\sim f(\mathbf{y},\mathbf{X},\boldsymbol{\beta}_k,\phi)}{\mathbb{E}[-H(\mathbf{y})]^{-1}}S(\boldsymbol{\beta}_k),
+\end{equation}
+where $S(\boldsymbol{\beta}_k)$ is the score function, namely the gradient of the log-likelihood, and $\mathbb{E}[-H(\mathbf{y})]$ is the expected Fisher information matrix with respect to the responses $\mathbf{y}$ having as distribution $f(\mathbf{y},\boldsymbol{\beta})$ evaluated at the current iteration $\boldsymbol{\beta}_k$.
+There is an important simplification in \eqref{FS} when a canonical link (mean function becomes the inverse link) is used, namely, the Hessian matrix no longer depends on $\mathbf{y}$; therefore averaging with respect to $\mathbf{y}$ (to obtain the expected Fisher information matrix $I(\boldsymbol{\beta})$) or plugging in $\mathbf{y}$ to obtain the observed one, $I_{\text{obs}}(\boldsymbol{\beta})$ leads to the same $-H$. Indeed, we can define the generic element of $H$ in the non-canonical link case to show what happens. We start from the log-likelihood of a GLM whose response belongs to the dispersion exponential family of order one $\mathcal{F}_{\text{DE}}^{(1)}$:
+\begin{equation}
+\label{DE1}
+l(\boldsymbol{\beta},\phi,\mathbf{y},\mathbf{X})=\sum_{i=1}^n\left[\frac{y_i\theta(g^{-1}(\mathbf{x}_i^\top\boldsymbol{\beta}))-C(\theta(g^{-1}(\mathbf{x}_i^\top\boldsymbol{\beta})))}{h(\phi)}+d(y_i,\phi)\right]=\sum_{i=1}^nl_i(\boldsymbol{\beta},\phi,\mathbf{y},\mathbf{X})
+\end{equation}
+As we can see, the global log-likelihood is made of $n$ contributions $l_{i}(\cdot)$, since we want to compute the first derivative of \eqref{DE1} we can split it into $n$ components and aggregate the derivative at the end. In this regard, using the chain rule the derivative of $l_i$ with respect to a generic $\beta_j$ has the following form:
+\begin{equation}
+\frac{\partial l_i}{\partial \beta_j}=\frac{\partial l_i}{\partial \theta_i}\frac{\partial \theta_i}{\partial \mu_i}\frac{\partial \mu_i}{\partial \eta_i}\frac{\partial \eta_i}{\partial \beta_j}=\dots=\frac{y_i-\mu_i}{\text{Var}(y_i)}\frac{\partial g^{-1}(\eta_i)}{\eta_i}x_{ij}
+\end{equation}
+Where $\theta_i$ is the canonical parameter, $\mu_i$ the expected value of the response and $\eta_i$ the linear predictor. 
+By adding together the $n$ components, we obtain the $j^{th}$ element of the score function. Consequently, we can proceed with computing the generic element of H. This is done by exploiting the linearity of the second derivative and the product rule:
+\begin{equation}
+H_{ij}=\frac{\partial^2l}{\partial\beta_k\partial\beta_j}=\dots=\frac{x_{ij}}{h(\phi)}\left(-\frac{\partial\mu_i}{\partial\eta_i}x_{ik}\left(\frac{\partial\mu_i}{\partial \eta_i}\frac{1}{V(\mu_i)}\right)+(y_i-\mu_i)(\dots)\right)
+\end{equation}
+Clearly, the generic element of $H$ depends on $\mathbf{y}$ when a non-canonical link is used. However, the expectation reduces the part depending on $y_i$ to zero since $\mathbb{E}[y_i-\mu_i]=0$, hence the $(j,k)$ element of the expected Fisher information matrix $I(\boldsymbol{\beta})$ is just:
+\begin{equation}
+\label{W}
+I(\boldsymbol{\beta})_{j,k}=\sum_{i=1}^n\left(\frac{\partial\mu_i}{\eta_i}\right)^2\frac{x_{ij}x_{ik}}{V(\mu_i)h(\phi)}
+\end{equation}
+In this regard, a useful way of rewriting the Fisher information matrix is the following: 
+\begin{equation}
+I(\boldsymbol{\beta})=\mathbf{X}^\top\text{diag}(w_1,\dots,w_n)\mathbf{X}\qquad\text{with}\quad w_i=\left(\frac{\partial\mu_i}{\eta_i}\right)^2\frac{1}{V(\mu_i)h(\phi)}
+\end{equation}
+The matrix of weights gets further simplified if we use a canonical link and recognize that since $\eta_i=\theta_i$, the squared derivative is $V(\mu_i)^2$, which leads to:
+\begin{equation}
+I(\boldsymbol{\beta})_{j,k}=\sum_{i=1}^nV(\mu_i)^2\frac{x_{ij}x_{ik}}{V(\mu_i)h(\phi)}=\sum_{i=1}^n\frac{V(\mu_i)}{h(\phi)}x_{ij}x_{ik}
+\end{equation}
+Similarly to the general case, with a canonical link, the Fisher Information matrix can be rewritten as $I(\boldsymbol{\beta})=\mathbf{X}^\top\text{diag}(v_1,\dots,v_n)\mathbf{X}$ with $v_i=V(\mu_i)/h(\phi)$.
+Considering the actual implementation of the algorithm, FS would require the computation of a gradient and a Hessian. However, there is a more efficient way of rewriting Fisher's scoring, which is the Iteratively Reweighted Least Squares (IRLS). This is exactly FS, but reframed as a Weighted Least Squares with both a matrix of weights and responses that change at each iteration. Indeed, by multiplying on the left of each term in \eqref{FS} the quantity $I(\boldsymbol{\beta}_k)$, and doing some simplifications, we obtain:
+\begin{equation}
+\label{eq1}
+\mathbf{X}^\top\mathbf{W}^{(k)}\mathbf{X}\boldsymbol{\beta}_{k+1}=\mathbf{X}^\top\mathbf{W}^{(k)}\mathbf{X}\boldsymbol{\beta}_{k}+S(\boldsymbol{\beta}_k)
+\end{equation}
+At this point, we can recognize that the right-hand side of the equation can be rewritten as $\mathbf{X}^\top\mathbf{W}^{(k)}\mathbf{z}^{(k)}$ where $z_i^{(k)}=\eta_i^{(k)}+(y_i-\mu_i^{(k)})\large\frac{\partial\eta_i^{(r)}}{\partial\mu_i^{(r)}}$ is the $i^{th}$ working response. Consequently, by isolating $\boldsymbol{\beta}_k$ on the left of the equation \eqref{eq1} we obtain:
+\begin{equation}
+\boldsymbol{\beta}_{k+1}=(\mathbf{X}^\top\mathbf{W}^{(k)}\mathbf{X})^{-1}\mathbf{X}^\top\mathbf{W}^{(k)}\mathbf{z}^{(k)}
+\end{equation}
+which is a Weighted Least Squares with a matrix of weights $\mathbf{W}^{(k)}$ changing at each iteration according to \eqref{W} and a working response $\mathbf{z}^{(k)}$ also changing at each iteration. Since IRLS is just an alternative way of writing a Newton-Raphson algorithm, what we are actually doing at each iteration is approximating the log-likelihood of the model with a quadratic function and finding the maximizer $\boldsymbol{\beta}^{(k)}$.   
+Therefore, we can identify the IRLS for a specific GLM by specifying $w_i$ and $z_i$. In Table \ref{tab} are displayed the working response and weight for three distinct GLMs.
+\renewcommand{\arraystretch}{3}
+\begin{table}[ht]
+\label{tab}
+\centering
+\begin{tabular}{|l|c|c|c|}
+\hline
+ & Logistic binary regression 
+ & Probit binary regression 
+ & Poisson regression (log link) \\
+\hline
+$w_i$ 
+& $\frac{\text{exp}(\eta_i)}{1+\text{exp}(\eta_i)}
+   \left(1-\frac{\text{exp}(\eta_i)}{1+\text{exp}(\eta_i)}\right)$
+& $\phi_{Z}(\eta_i)^2\frac{1}{\Phi(\eta_i)(1-\Phi(\eta_i))}$
+& $\text{exp}(\eta_i)$ \\
+\hline
+$z_i$ 
+& $\eta_i+\left(y_i-\frac{\text{exp}(\eta_i)}{1+\text{exp}(\eta_i)}\right)
+   \frac{1}{\mu_i(1-\mu_i)}$
+& $\eta_i+\left(y_i-\Phi(\eta_i)\right)\frac{1}{\phi(\eta_i)}$
+& $\eta_i+\left(y_i-\text{exp}(\eta_i)\right)\frac{1}{\text{exp}(\eta_i)}$ \\
+\hline
+
+\end{tabular}
+\caption{IRLS working responses and weights across GLM}
+\end{table}
+From a practical point of view, to implement FS, we need to define a starting value, for example $\boldsymbol{\beta}_0=\mathbf{0}$ and a stopping criterion. In our implementation, we used the $L_2$ norm of the difference between two consecutive iterations $ \|\boldsymbol{\beta}_{k+1}-\boldsymbol{\beta}_k\|_2<\epsilon$ with $\epsilon$ provided by the user. 
+\section{Markov Chain Montecarlo}
+\section{R analysis comment}
+\end{document}
