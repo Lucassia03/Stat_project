@@ -21,6 +21,8 @@
 
 
 rm(list = ls())
+#install.packages("glue")
+library(glue)
 
 # arguments:
 # - y: response (binary or count)
@@ -34,6 +36,7 @@ rm(list = ls())
 
 
 fs <- function(y, X, family, link, trace, intercept, eps, maxit) {
+  
   # response variable
   y <- as.matrix(y)
 
@@ -101,25 +104,37 @@ fs <- function(y, X, family, link, trace, intercept, eps, maxit) {
     dist <- sqrt(sum((b2 - b1)^2))
     b1 <- b2
 
+    # standard deviations of the regression coefficients
+    se <- sqrt(diag(solve((t(X) %*% W %*% X + diag(rep(1e-15, nc))))))
+    
     if (trace) {
-      out <- t(b1)
-      out <- c(b1, as.integer(counter))
+      out <- matrix(b1,ncol=1)
       if (intercept) {
-        names(out) <- c("(intercept)", col_names, "n_iter")
-        cat("\nCoefficients:\n")
+        rownames(out) <- c("(intercept)", col_names)
+        ts <- b1/se
+        pv <- 2*(1-pnorm(abs(ts)))
+        out <- cbind(out,se,pv)
+        colnames(out) <- c("Coeff.","S.E.","p-value Wald test")
         print(out)
+        cat("\n")
+        cat(glue("Number of IRLS iterations: {counter}"))
+        cat("\n")
       } else {
-        names(out) <- c(col_names, "n_iter")
-        cat("\nCoefficients:\n")
+        rownames(out) <- c(col_names)
+        ts <- b1[-1]/se[-1]
+        pv <- 2*(1-pnorm(abs(ts)))
+        out <- cbind(out[-1],se[-1],pv)
+        colnames(out) <- c("Coeff.","S.E.","p-value Wald test")
         print(out)
+        cat("\n")
+        cat(glue("Number of IRLS iterations: {counter}"))
+        cat("\n")
       }
     }
     counter <- counter + 1
   }
-  out <- as.numeric(t(b1))
   return(out)
 }
-
 
 # Test with data
 
@@ -133,8 +148,8 @@ y <- data$los
 X <- data[, which(names(data) != "los")]
 
 # poisson regression
-fs(y, X, family = "poisson", trace = TRUE, intercept = TRUE, eps = 1e-15, maxit = 100)
-coef(mod)
+fs(y, X, family = "poisson", trace = TRUE, intercept = TRUE, eps = 1e-7, maxit = 20)
+summary(mod)
 
 # CreditCard data
 library(AER)
@@ -152,8 +167,8 @@ X$owner <- ifelse(CreditCard$owner == "yes", 1, 0)
 
 # logistic regression
 fs(y, X, family = "bernoulli", link = "logit", trace = TRUE, intercept = TRUE, eps = 1e-15, maxit = 100)
-coef(mod_logit)
+summary(mod_logit)
 
 # probit regression
 fs(y, X, family = "bernoulli", link = "probit", trace = TRUE, intercept = TRUE, eps = 1e-15, maxit = 100)
-coef(mod_probit)
+summary(mod_probit)
